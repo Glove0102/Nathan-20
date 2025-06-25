@@ -1,0 +1,140 @@
+/* Custom styles for the AI calling system */
+
+.conversation-message {
+    margin-bottom: 1rem;
+    animation: fadeIn 0.3s ease-in;
+}
+
+.conversation-message.user {
+    text-align: right;
+}
+
+.conversation-message.assistant {
+    text-align: left;
+}
+
+.message-bubble {
+    display: inline-block;
+    max-width: 70%;
+    padding: 0.75rem 1rem;
+    border-radius: 1rem;
+    word-wrap: break-word;
+}
+
+.message-bubble.user {
+    background-color: var(--bs-primary);
+    color: white;
+    border-bottom-right-radius: 0.25rem;
+}
+
+.message-bubble.assistant {
+    background-color: var(--bs-secondary);
+    color: white;
+    border-bottom-left-radius: 0.25rem;
+}
+
+.message-timestamp {
+    font-size: 0.75rem;
+    opacity: 0.7;
+    margin-top: 0.25rem;
+}
+
+.call-status-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.status-calling {
+    color: var(--bs-warning);
+}
+
+.status-connected {
+    color: var(--bs-success);
+}
+
+.status-ai-speaking {
+    color: var(--bs-info);
+}
+
+.status-disconnected {
+    color: var(--bs-danger);
+}
+
+.pulse {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+    100% {
+        opacity: 1;
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.system-log-entry {
+    margin-bottom: 0.25rem;
+    padding: 0.25rem;
+    border-left: 3px solid transparent;
+}
+
+.log-info {
+    border-left-color: var(--bs-info);
+}
+
+.log-success {
+    border-left-color: var(--bs-success);
+}
+
+.log-warning {
+    border-left-color: var(--bs-warning);
+}
+
+.log-error {
+    border-left-color: var(--bs-danger);
+}
+
+.loading-spinner {
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid transparent;
+    border-top: 2px solid currentColor;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .message-bubble {
+        max-width: 85%;
+    }
+    
+    .card-body {
+        padding: 1rem;
+    }
+}
