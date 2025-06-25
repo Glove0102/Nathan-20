@@ -32,9 +32,11 @@ def initiate_call():
         db.session.add(call)
         db.session.commit()
         
-        # Get the public URL for webhook
-        repl_url = os.environ.get('REPL_URL', f"https://{os.environ.get('REPL_SLUG', 'workspace')}.{os.environ.get('REPL_OWNER', 'user')}.repl.co")
-        webhook_url = f"{repl_url}/webhook"
+        # Get the public URL for webhook - use the correct Replit domain
+        domain = os.environ.get('REPLIT_DOMAINS', '').split(',')[0] if os.environ.get('REPLIT_DOMAINS') else None
+        if not domain:
+            domain = f"{os.environ.get('REPL_SLUG', 'workspace')}.{os.environ.get('REPL_OWNER', 'user')}.repl.co"
+        webhook_url = f"https://{domain}/webhook"
         
         # Initiate Twilio call
         twilio_call = twilio_client.calls.create(
