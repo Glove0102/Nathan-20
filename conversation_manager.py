@@ -42,14 +42,16 @@ Remember, this is a voice conversation, so be conversational and natural."""
             return
             
         try:
-            turn = ConversationTurn()
-            turn.call_id = self.call_id
-            turn.role = role
-            turn.content = content
-            db.session.add(turn)
-            db.session.commit()
-            
-            logging.info(f"Added {role} message to conversation: {content[:50]}...")
+            from app import app
+            with app.app_context():
+                turn = ConversationTurn()
+                turn.call_id = self.call_id
+                turn.role = role
+                turn.content = content
+                db.session.add(turn)
+                db.session.commit()
+                
+                logging.info(f"Added {role} message to conversation: {content[:50]}...")
             
         except Exception as e:
             logging.error(f"Error adding message to conversation: {str(e)}")
@@ -60,22 +62,24 @@ Remember, this is a voice conversation, so be conversational and natural."""
             return []
             
         try:
-            turns = ConversationTurn.query.filter_by(call_id=self.call_id)\
-                                        .order_by(ConversationTurn.timestamp.desc())\
-                                        .limit(limit)\
-                                        .all()
-            
-            # Reverse to get chronological order
-            turns.reverse()
-            
-            history = []
-            for turn in turns:
-                history.append({
-                    "role": turn.role,
-                    "content": turn.content
-                })
-            
-            return history
+            from app import app
+            with app.app_context():
+                turns = ConversationTurn.query.filter_by(call_id=self.call_id)\
+                                            .order_by(ConversationTurn.timestamp.desc())\
+                                            .limit(limit)\
+                                            .all()
+                
+                # Reverse to get chronological order
+                turns.reverse()
+                
+                history = []
+                for turn in turns:
+                    history.append({
+                        "role": turn.role,
+                        "content": turn.content
+                    })
+                
+                return history
             
         except Exception as e:
             logging.error(f"Error getting conversation history: {str(e)}")
@@ -116,8 +120,10 @@ Remember, this is a voice conversation, so be conversational and natural."""
     async def generate_response(self):
         """Generate AI response using OpenAI GPT"""
         try:
-            # Get conversation history
-            history = self.get_conversation_history()
+            from app import app
+            # Get conversation history within app context
+            with app.app_context():
+                history = self.get_conversation_history()
             
             # Build messages for OpenAI
             messages = [{"role": "system", "content": self.system_prompt}]
