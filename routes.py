@@ -19,6 +19,7 @@ def index():
 
 @app.route('/initiate_call', methods=['POST'])
 def initiate_call():
+    call = None
     try:
         data = request.get_json()
         phone_number = data.get('phone_number')
@@ -29,10 +30,11 @@ def initiate_call():
         # Create call record
         call = Call(phone_number=phone_number, status='initiating')
         db.session.add(call)
-        db.session.flush()  # Flush to get the ID without committing
+        db.session.commit()
         
         # Get the public URL for webhook
-        webhook_url = f"https://{os.environ.get('REPL_SLUG', 'workspace')}.{os.environ.get('REPL_OWNER', 'user')}.repl.co/webhook"
+        repl_url = os.environ.get('REPL_URL', f"https://{os.environ.get('REPL_SLUG', 'workspace')}.{os.environ.get('REPL_OWNER', 'user')}.repl.co")
+        webhook_url = f"{repl_url}/webhook"
         
         # Initiate Twilio call
         twilio_call = twilio_client.calls.create(
@@ -57,6 +59,11 @@ def initiate_call():
         
     except Exception as e:
         logging.error(f"Error initiating call: {str(e)}")
+        if call:
+            try:
+                db.session.rollback()
+            except:
+                pass
         return jsonify({'error': f'Failed to initiate call: {str(e)}'}), 500
 
 @app.route('/webhook', methods=['POST'])
@@ -69,17 +76,22 @@ def webhook():
         logging.info(f"Webhook called - CallSid: {call_sid}, Status: {call_status}")
         
         # Update call status in database
-        call = Call.query.filter_by(call_sid=call_sid).first()
-        if call:
-            call.status = call_status
-            db.session.commit()
+        try:
+            call = Call.query.filter_by(call_sid=call_sid).first()
+            if call:
+                call.status = call_status
+                db.session.commit()
+        except Exception as db_error:
+            logging.error(f"Database error in webhook: {str(db_error)}")
+            db.session.rollback()
         
         # Create TwiML response to establish Media Stream
         response = VoiceResponse()
         
         if call_status == 'answered':
             # Get WebSocket URL for media streaming
-            websocket_url = f"wss://{os.environ.get('REPL_SLUG', 'workspace')}.{os.environ.get('REPL_OWNER', 'user')}.repl.co:8000"
+            repl_url = os.environ.get('REPL_URL', f"https://{os.environ.get('REPL_SLUG', 'workspace')}.{os.environ.get('REPL_OWNER', 'user')}.repl.co")
+            websocket_url = repl_url.replace('https://', 'wss://') + ":8000"
             
             connect = Connect()
             stream = Stream(url=websocket_url)

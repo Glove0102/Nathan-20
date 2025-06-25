@@ -8,7 +8,7 @@ backlog = 2048
 workers = 1
 worker_class = "eventlet"
 worker_connections = 1000
-timeout = 120
+timeout = 60
 keepalive = 30
 
 # Restart workers after this many requests, to help prevent memory leaks
