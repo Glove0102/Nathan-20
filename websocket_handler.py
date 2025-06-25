@@ -35,9 +35,10 @@ def handle_disconnect():
     """Handle frontend WebSocket disconnection"""
     logging.info("Frontend client disconnected")
 
-async def handle_twilio_websocket(websocket, path):
+async def handle_twilio_websocket(websocket):
     """Handle Twilio Media Stream WebSocket connections"""
     session = None
+    path = websocket.path
     
     try:
         logging.info(f"New Twilio WebSocket connection established on path: {path}")
