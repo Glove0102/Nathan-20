@@ -40,7 +40,7 @@ async def handle_twilio_websocket(websocket, path):
     session = None
     
     try:
-        logging.info(f"New Twilio WebSocket connection: {path}")
+        logging.info(f"New Twilio WebSocket connection established on path: {path}")
         
         async for message in websocket:
             try:
