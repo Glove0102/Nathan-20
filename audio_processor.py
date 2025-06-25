@@ -7,21 +7,20 @@ import time
 class AudioProcessor:
     def __init__(self):
         self.audio_buffer = deque()
-        # Increased silence_threshold to filter out more background noise.
-        # This value might need further tuning based on your environment's noise level.
-        self.silence_threshold = 70 
+        self.silence_threshold = 40  # Retain this for good speech detection
 
-        # Increased min_speech_duration to ensure more substantial speech is captured.
-        self.min_speech_duration = 1.5  # Minimum speech duration in seconds
+        # Slightly reduced min_speech_duration to be less restrictive, but still aim for coherent speech.
+        self.min_speech_duration = 1.0  # Minimum speech duration in seconds
 
-        # Increased max_speech_duration to allow for longer user monologues before forced transcription.
-        self.max_speech_duration = 20.0  # Maximum speech duration in seconds
+        self.max_speech_duration = 25.0  # Allow for long user turns
 
-        # Increased silence_duration to allow for natural pauses in speech without ending the utterance prematurely.
-        self.silence_duration = 2.0  # Required silence duration to end utterance
+        # Significantly increased silence_duration to ensure the system waits for a clear end of user speech.
+        # This is crucial for preventing interruptions.
+        self.silence_duration = 3.0  # Required silence duration to end utterance
 
-        # Kept min_buffer_duration at 0.5s as recommended by OpenAI for Whisper.
-        self.min_buffer_duration = 0.5  # Minimum 500ms for OpenAI Whisper
+        # Reverted min_buffer_duration to 0.5s. It will still send chunks of at least 0.5s,
+        # but the primary trigger for a "complete utterance" will now be the silence_duration.
+        self.min_buffer_duration = 0.5  # Minimum 0.5 second for OpenAI Whisper
 
         self.last_speech_time = 0
         self.utterance_start_time = 0
@@ -80,19 +79,16 @@ class AudioProcessor:
         buffer_bytes = sum(len(chunk) for chunk in self.audio_buffer)
         buffer_duration = buffer_bytes / self.bytes_per_second
 
-        # Ensure minimum duration for OpenAI Whisper
-        if buffer_duration < self.min_buffer_duration:
-            return False
+        # Key change: rely more on silence_duration after speech,
+        # and ensure a minimum meaningful speech duration.
+        if self.speech_detected and buffer_duration >= self.min_buffer_duration:
+            if utterance_duration >= self.min_speech_duration and silence_duration >= self.silence_duration:
+                return True
+            # Also, check if max duration is reached as a fallback
+            if utterance_duration >= self.max_speech_duration:
+                return True
 
-        # Check conditions for complete utterance
-        conditions = [
-            # Speech detected, minimum duration reached, and sufficient silence
-            self.speech_detected and utterance_duration >= self.min_speech_duration and silence_duration >= self.silence_duration,
-            # Maximum speech duration reached (to prevent excessively long buffers)
-            utterance_duration >= self.max_speech_duration
-        ]
-
-        return any(conditions)
+        return False
 
     def get_and_clear_buffer(self):
         """Get buffered audio and clear the buffer"""
