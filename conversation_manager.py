@@ -121,7 +121,8 @@ Remember, this is a voice conversation, so be conversational and natural."""
             
             # Build messages for OpenAI
             messages = [{"role": "system", "content": self.system_prompt}]
-            messages.extend(history)
+            for msg in history:
+                messages.append({"role": msg["role"], "content": msg["content"]})
             
             # Generate response
             response = self.openai_client.chat.completions.create(
