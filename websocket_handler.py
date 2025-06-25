@@ -240,13 +240,19 @@ def start_websocket_server():
     """Start the WebSocket server for Twilio Media Streams"""
     async def server():
         # Start WebSocket server on port 8000 for Twilio
-        await websockets.serve(handle_twilio_websocket, "0.0.0.0", 8000)
+        server_instance = await websockets.serve(handle_twilio_websocket, "0.0.0.0", 8000)
         logging.info("Twilio WebSocket server started on port 8000")
+        # Keep the server running
+        await server_instance.wait_closed()
         
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    loop.run_until_complete(server())
-    loop.run_forever()
+    try:
+        loop.run_until_complete(server())
+    except KeyboardInterrupt:
+        logging.info("WebSocket server stopped")
+    finally:
+        loop.close()
 
 # Start WebSocket server in a separate thread
 websocket_thread = threading.Thread(target=start_websocket_server, daemon=True)
