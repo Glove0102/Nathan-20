@@ -170,55 +170,68 @@ async def process_audio_chunk(session, media_data):
         if session.audio_processor.has_complete_utterance():
             audio_buffer = session.audio_processor.get_and_clear_buffer()
             
-            # Convert to text using Whisper
-            transcript = await session.conversation_manager.speech_to_text(audio_buffer)
-            
-            if transcript and transcript.strip():
-                logging.info(f"User said: {transcript}")
+            if audio_buffer and len(audio_buffer) > 0:
+                buffer_duration = len(audio_buffer) / 16000  # 8kHz * 2 bytes per sample
+                logging.info(f"Processing audio buffer: {len(audio_buffer)} bytes ({buffer_duration:.2f}s)")
                 
-                # Add to conversation history
-                with app.app_context():
-                    try:
-                        session.conversation_manager.add_message("user", transcript)
-                    except Exception as e:
-                        logging.error(f"Database error adding user message: {str(e)}")
+                # Convert to text using Whisper
+                transcript = await session.conversation_manager.speech_to_text(audio_buffer)
                 
-                # Notify frontend
-                socketio.emit('conversation_update', {
-                    'role': 'user',
-                    'content': transcript,
-                    'stream_sid': session.stream_sid
-                })
-                
-                # Generate AI response
-                response_text = await session.conversation_manager.generate_response()
-                
-                if response_text:
-                    logging.info(f"AI responded: {response_text}")
+                if transcript and transcript.strip():
+                    logging.info(f"User said: {transcript}")
                     
                     # Add to conversation history
                     with app.app_context():
                         try:
-                            session.conversation_manager.add_message("assistant", response_text)
+                            session.conversation_manager.add_message("user", transcript)
                         except Exception as e:
-                            logging.error(f"Database error adding AI response: {str(e)}")
-                    
-                    # Convert to speech
-                    audio_data = await session.conversation_manager.text_to_speech(response_text)
-                    
-                    if audio_data:
-                        # Send audio to Twilio
-                        await send_audio_to_twilio(session, audio_data)
+                            logging.error(f"Database error adding user message: {str(e)}")
                     
                     # Notify frontend
                     socketio.emit('conversation_update', {
-                        'role': 'assistant',
-                        'content': response_text,
+                        'role': 'user',
+                        'content': transcript,
                         'stream_sid': session.stream_sid
                     })
                     
+                    # Generate AI response
+                    response_text = await session.conversation_manager.generate_response()
+                    
+                    if response_text:
+                        logging.info(f"AI responded: {response_text}")
+                        
+                        # Add to conversation history
+                        with app.app_context():
+                            try:
+                                session.conversation_manager.add_message("assistant", response_text)
+                            except Exception as e:
+                                logging.error(f"Database error adding AI response: {str(e)}")
+                        
+                        # Convert to speech
+                        audio_data = await session.conversation_manager.text_to_speech(response_text)
+                        
+                        if audio_data:
+                            logging.info(f"Sending TTS audio to Twilio: {len(audio_data)} chars")
+                            # Send audio to Twilio
+                            await send_audio_to_twilio(session, audio_data)
+                        else:
+                            logging.error("Failed to generate TTS audio")
+                        
+                        # Notify frontend
+                        socketio.emit('conversation_update', {
+                            'role': 'assistant',
+                            'content': response_text,
+                            'stream_sid': session.stream_sid
+                        })
+                else:
+                    logging.warning(f"No transcript received for audio buffer of {len(audio_buffer)} bytes")
+            else:
+                logging.warning("Audio buffer is empty after processing")
+                    
     except Exception as e:
         logging.error(f"Error processing audio chunk: {str(e)}")
+        import traceback
+        logging.error(f"Audio processing traceback: {traceback.format_exc()}")
 
 async def send_audio_to_twilio(session, audio_data):
     """Send audio data back to Twilio"""

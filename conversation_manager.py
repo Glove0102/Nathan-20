@@ -42,11 +42,10 @@ Remember, this is a voice conversation, so be conversational and natural."""
             return
             
         try:
-            turn = ConversationTurn(
-                call_id=self.call_id,
-                role=role,
-                content=content
-            )
+            turn = ConversationTurn()
+            turn.call_id = self.call_id
+            turn.role = role
+            turn.content = content
             db.session.add(turn)
             db.session.commit()
             
@@ -132,10 +131,14 @@ Remember, this is a voice conversation, so be conversational and natural."""
                 temperature=0.7
             )
             
-            response_text = response.choices[0].message.content.strip()
-            logging.info(f"Generated response: {response_text}")
-            
-            return response_text
+            response_text = response.choices[0].message.content
+            if response_text:
+                response_text = response_text.strip()
+                logging.info(f"Generated response: {response_text}")
+                return response_text
+            else:
+                logging.warning("Empty response from OpenAI")
+                return "I'm sorry, I didn't catch that. Could you please repeat?"
             
         except Exception as e:
             logging.error(f"Error generating response: {str(e)}")
@@ -144,7 +147,7 @@ Remember, this is a voice conversation, so be conversational and natural."""
     async def text_to_speech(self, text):
         """Convert text to speech using OpenAI TTS"""
         try:
-            # Generate speech using OpenAI TTS with proper format for Twilio
+            # Generate speech using OpenAI TTS
             response = self.openai_client.audio.speech.create(
                 model="tts-1",
                 voice="alloy",
@@ -152,21 +155,24 @@ Remember, this is a voice conversation, so be conversational and natural."""
                 response_format="pcm"  # Use PCM format for better compatibility
             )
             
-            # Get raw PCM audio data
+            # Get raw PCM audio data (OpenAI TTS outputs 24kHz, 16-bit, mono)
             pcm_audio = response.content
             
-            # Convert PCM to mulaw and encode for Twilio
-            # First downsample to 8kHz if needed
             import audioop
             import base64
             
-            # Convert to mulaw (8-bit, 8kHz)
-            mulaw_audio = audioop.lin2ulaw(pcm_audio, 2)
+            # Convert from OpenAI's 24kHz to Twilio's 8kHz
+            # OpenAI TTS outputs 24kHz, 16-bit, mono PCM
+            downsampled_audio = audioop.ratecv(pcm_audio, 2, 1, 24000, 8000, None)[0]
             
-            # Encode to base64 for Twilio
+            # Convert to mulaw format for Twilio
+            mulaw_audio = audioop.lin2ulaw(downsampled_audio, 2)
+            
+            # Encode to base64 for Twilio WebSocket
             encoded_audio = base64.b64encode(mulaw_audio).decode('utf-8')
             
-            logging.info(f"Generated TTS for: {text[:50]}... (size: {len(encoded_audio)} chars)")
+            audio_duration = len(pcm_audio) / (24000 * 2)  # Original duration at 24kHz
+            logging.info(f"Generated TTS for: {text[:50]}... (duration: {audio_duration:.2f}s, size: {len(encoded_audio)} chars)")
             
             return encoded_audio
             

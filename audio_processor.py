@@ -7,14 +7,18 @@ import time
 class AudioProcessor:
     def __init__(self):
         self.audio_buffer = deque()
-        self.silence_threshold = 500  # RMS threshold for silence detection
-        self.min_speech_duration = 1.0  # Minimum speech duration in seconds
+        self.silence_threshold = 20  # Lower threshold for better speech detection
+        self.min_speech_duration = 0.5  # Minimum speech duration in seconds
         self.max_speech_duration = 10.0  # Maximum speech duration in seconds
-        self.silence_duration = 1.5  # Required silence duration to end utterance
+        self.silence_duration = 1.0  # Required silence duration to end utterance
+        self.min_buffer_duration = 0.2  # Minimum 200ms for OpenAI Whisper
         
         self.last_speech_time = 0
         self.utterance_start_time = 0
         self.consecutive_silence_count = 0
+        self.speech_detected = False
+        self.sample_rate = 8000  # Twilio uses 8kHz
+        self.bytes_per_second = 16000  # 8kHz * 2 bytes per sample for 16-bit
         
     def add_audio_chunk(self, payload):
         """Add audio chunk to buffer and process"""
@@ -36,6 +40,7 @@ class AudioProcessor:
             if is_speech:
                 self.last_speech_time = current_time
                 self.consecutive_silence_count = 0
+                self.speech_detected = True
                 
                 # Mark start of utterance
                 if not self.audio_buffer:
@@ -61,10 +66,18 @@ class AudioProcessor:
         utterance_duration = current_time - self.utterance_start_time
         silence_duration = current_time - self.last_speech_time
         
+        # Calculate buffer duration in seconds
+        buffer_bytes = sum(len(chunk) for chunk in self.audio_buffer)
+        buffer_duration = buffer_bytes / self.bytes_per_second
+        
+        # Ensure minimum duration for OpenAI Whisper
+        if buffer_duration < self.min_buffer_duration:
+            return False
+        
         # Check conditions for complete utterance
         conditions = [
-            # Minimum speech duration reached and sufficient silence
-            utterance_duration >= self.min_speech_duration and silence_duration >= self.silence_duration,
+            # Speech detected, minimum duration reached, and sufficient silence
+            self.speech_detected and utterance_duration >= self.min_speech_duration and silence_duration >= self.silence_duration,
             # Maximum speech duration reached
             utterance_duration >= self.max_speech_duration
         ]
@@ -87,8 +100,10 @@ class AudioProcessor:
             self.last_speech_time = 0
             self.utterance_start_time = 0
             self.consecutive_silence_count = 0
+            self.speech_detected = False
             
-            logging.info(f"Audio buffer cleared - Size: {len(combined_audio)} bytes")
+            buffer_duration = len(combined_audio) / self.bytes_per_second
+            logging.info(f"Audio buffer cleared - Size: {len(combined_audio)} bytes ({buffer_duration:.2f}s)")
             
             return combined_audio
             
