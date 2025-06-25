@@ -127,11 +127,13 @@ async def send_initial_greeting(session):
     """Send initial AI greeting to the caller"""
     try:
         greeting_text = "Hello! I'm an AI assistant. How can I help you today?"
+        logging.info(f"Sending initial greeting: {greeting_text}")
         
         # Generate TTS audio
         audio_data = await session.conversation_manager.text_to_speech(greeting_text)
         
         if audio_data:
+            logging.info(f"Generated audio data, length: {len(audio_data)}")
             # Send audio to Twilio
             await send_audio_to_twilio(session, audio_data)
             
@@ -139,6 +141,7 @@ async def send_initial_greeting(session):
             with app.app_context():
                 try:
                     session.conversation_manager.add_message("assistant", greeting_text)
+                    logging.info("Added greeting to conversation history")
                 except Exception as e:
                     logging.error(f"Database error adding greeting: {str(e)}")
             
@@ -148,9 +151,14 @@ async def send_initial_greeting(session):
                 'content': greeting_text,
                 'stream_sid': session.stream_sid
             })
+            logging.info("Sent greeting notification to frontend")
+        else:
+            logging.error("Failed to generate audio data for greeting")
             
     except Exception as e:
         logging.error(f"Error sending initial greeting: {str(e)}")
+        import traceback
+        logging.error(f"Greeting error traceback: {traceback.format_exc()}")
 
 async def process_audio_chunk(session, media_data):
     """Process incoming audio chunk from caller"""

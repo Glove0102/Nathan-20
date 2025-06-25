@@ -144,26 +144,36 @@ Remember, this is a voice conversation, so be conversational and natural."""
     async def text_to_speech(self, text):
         """Convert text to speech using OpenAI TTS"""
         try:
-            # Generate speech using OpenAI TTS
+            # Generate speech using OpenAI TTS with proper format for Twilio
             response = self.openai_client.audio.speech.create(
-                model="tts-1",  # Using tts-1 as it's available and cost-effective
-                voice="alloy",  # Clear, pleasant voice suitable for seniors
+                model="tts-1",
+                voice="alloy",
                 input=text,
-                response_format="wav"
+                response_format="pcm"  # Use PCM format for better compatibility
             )
             
-            # Get audio data
-            audio_data = response.content
+            # Get raw PCM audio data
+            pcm_audio = response.content
             
-            # Convert to Twilio format
-            encoded_audio = self.audio_processor.convert_from_openai_format(audio_data)
+            # Convert PCM to mulaw and encode for Twilio
+            # First downsample to 8kHz if needed
+            import audioop
+            import base64
             
-            logging.info(f"Generated TTS for: {text[:50]}...")
+            # Convert to mulaw (8-bit, 8kHz)
+            mulaw_audio = audioop.lin2ulaw(pcm_audio, 2)
+            
+            # Encode to base64 for Twilio
+            encoded_audio = base64.b64encode(mulaw_audio).decode('utf-8')
+            
+            logging.info(f"Generated TTS for: {text[:50]}... (size: {len(encoded_audio)} chars)")
             
             return encoded_audio
             
         except Exception as e:
             logging.error(f"Error in text to speech: {str(e)}")
+            import traceback
+            logging.error(f"TTS Error traceback: {traceback.format_exc()}")
             return None
 
     def _write_wav_file(self, file, audio_data):

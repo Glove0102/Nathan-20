@@ -90,7 +90,8 @@ def webhook():
         # Create TwiML response to establish Media Stream
         response = VoiceResponse()
         
-        if call_status == 'answered':
+        # Always establish media stream regardless of status for real-time processing
+        if call_status in ['answered', 'in-progress']:
             # Get WebSocket URL for media streaming
             # Use the current replit domain but with the WebSocket port
             domain = os.environ.get('REPLIT_DOMAINS', '').split(',')[0] if os.environ.get('REPLIT_DOMAINS') else None
@@ -105,6 +106,11 @@ def webhook():
             stream = Stream(url=websocket_url)
             connect.append(stream)
             response.append(connect)
+        else:
+            # For other statuses, just provide a simple response
+            response.say("Hello! Please wait while we connect you to our AI assistant.")
+            response.pause(length=1)
+            response.hangup()
             
             logging.info(f"Media stream established for call {call_sid}")
         
