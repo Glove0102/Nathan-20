@@ -31,8 +31,8 @@ def initiate_call():
         db.session.add(call)
         db.session.commit()
         
-        # Get the public URL for webhook (you'll need to set this)
-        webhook_url = os.environ.get("WEBHOOK_URL", "https://your-domain.com") + "/webhook"
+        # Get the public URL for webhook
+        webhook_url = f"https://{os.environ.get('REPL_SLUG', 'workspace')}.{os.environ.get('REPL_OWNER', 'user')}.repl.co/webhook"
         
         # Initiate Twilio call
         twilio_call = twilio_client.calls.create(
@@ -79,7 +79,7 @@ def webhook():
         
         if call_status == 'answered':
             # Get WebSocket URL for media streaming
-            websocket_url = os.environ.get("WEBSOCKET_URL", "wss://your-domain.com") + "/media_stream"
+            websocket_url = f"wss://{os.environ.get('REPL_SLUG', 'workspace')}.{os.environ.get('REPL_OWNER', 'user')}.repl.co:8000"
             
             connect = Connect()
             stream = Stream(url=websocket_url)
