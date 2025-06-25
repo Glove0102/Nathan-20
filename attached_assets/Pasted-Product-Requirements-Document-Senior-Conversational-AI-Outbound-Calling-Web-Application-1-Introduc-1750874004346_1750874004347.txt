@@ -1,0 +1,203 @@
+Product Requirements Document: Senior Conversational AI Outbound Calling Web Application
+1. Introduction
+This document outlines the technical requirements for a web application designed to initiate outbound phone calls to senior users and enable a real-time, voice-based conversational interaction with an Artificial Intelligence (AI) model. The primary focus of this PRD is on the backend implementation and the integration of third-party APIs to achieve this functionality, with minimal frontend considerations.
+
+2. Project Goal
+To develop a technically robust and straightforward Python backend web application that facilitates automated outbound voice calls to specified phone numbers, connects the caller to an OpenAI-powered conversational AI, and transcribes/synthesizes speech in real-time. The application will enable users to interact with the AI using their voice, even from traditional landlines.
+
+3. Architecture Overview
+The system will primarily consist of a Python backend application acting as an intermediary between Twilio for telephony and OpenAI for AI capabilities. A frontend interface will serve as a minimal control panel to initiate calls and observe the interaction.
+
+graph TD
+    User[Frontend Web Browser] --> F1{Initiate Call (Phone Number)}
+    F1 --> B1(Python Backend Server)
+    B1 -- Calls Twilio API --> T1(Twilio Programmable Voice)
+    T1 -- Outbound Call --> S[Senior's Landline/Phone]
+    S -- Voice Audio --> T1
+    T1 -- Media Stream (WebSocket) --> B2(Python Backend WebSocket Server)
+    B2 -- Real-time Audio Chunks --> O1(OpenAI Whisper API - STT)
+    O1 -- Text Transcript --> B2
+    B2 -- Text Request --> O2(OpenAI GPT-4o-mini API - LLM)
+    O2 -- Text Response --> B2
+    B2 -- Text Response --> O3(OpenAI TTS API - gpt-4o-mini-tts)
+    O3 -- Audio Chunks --> B2
+    B2 -- Media Stream (WebSocket) --> T1
+    T1 -- Voice Audio --> S
+    B2 -- Live Transcript/Status --> F2{Live Chat Display}
+    B2 -- Errors/Logs --> M[Logging/Monitoring System]
+
+4. Backend Services and APIs
+4.1. Core Application Framework
+Technology: Python (e.g., Flask or FastAPI for HTTP endpoints, websockets library for WebSocket server).
+
+Purpose:
+
+Handle incoming HTTP requests from the frontend (to initiate calls).
+
+Serve as the WebSocket server for Twilio Media Streams.
+
+Manage the flow of audio, text, and API calls between Twilio and OpenAI.
+
+4.2. Twilio API Integration
+API: Twilio Programmable Voice API
+
+Functionality:
+
+Initiating outbound calls to a specified phone number.
+
+Setting up a webhook URL that Twilio will hit when the call is answered.
+
+Responding with TwiML to instruct Twilio to establish a Media Stream.
+
+API: Twilio Media Streams
+
+Functionality: Real-time, bidirectional streaming of raw audio from the phone call to the Python backend via WebSocket, and streaming synthesized audio back to the call.
+
+Audio Format: mulaw (8kHz, mono) will be received from Twilio and must be converted to 16-bit PCM for OpenAI, and converted back for streaming to Twilio.
+
+4.3. OpenAI API Integration
+API: OpenAI Whisper API (for Speech-to-Text - STT)
+
+Model: whisper-1 (or equivalent, for cost-effectiveness and real-time capability).
+
+Functionality: Convert incoming audio chunks from the user into text transcripts.
+
+API: OpenAI Chat Completions API (for Large Language Model - LLM)
+
+Model: gpt-4o-mini (chosen for cost-effectiveness).
+
+Functionality: Process the transcribed text, maintain conversation context, and generate a natural language text response.
+
+API: OpenAI Text-to-Speech (TTS) API
+
+Model: gpt-4o-mini-tts (chosen for cost-effectiveness).
+
+Functionality: Convert the LLM's text response into natural-sounding speech audio.
+
+5. Data Flow (Step-by-Step)
+Call Initiation:
+
+Frontend sends a POST request to the Python backend with the senior's phone number.
+
+Backend uses twilio.rest.Client to initiate an outbound call.
+
+The url parameter in the Twilio call creation points to a publicly accessible Twilio Function (or a dedicated webhook endpoint on your server).
+
+Twilio Call Answered & Webhook Triggered:
+
+When the senior answers the call, Twilio sends an HTTP POST request to the specified webhook URL.
+
+The webhook (Twilio Function or backend endpoint) responds with TwiML <Connect><Stream url="wss://your-websocket-server-url/ws">.
+
+WebSocket Connection Established:
+
+Twilio establishes a WebSocket connection to the Python backend's WebSocket server.
+
+Upon start event from Twilio, the backend sends an initial greeting to the senior via TTS.
+
+Real-time User Speech to Text:
+
+Twilio streams raw mulaw audio chunks from the senior's voice over the WebSocket to the backend.
+
+Backend continuously receives, decodes (ulaw2lin), and buffers these audio chunks.
+
+A voice activity detection (VAD) mechanism (e.g., RMS-based silence detection) identifies pauses in speech.
+
+When a significant pause or a maximum speech duration is reached, the buffered audio is sent to OpenAI Whisper.
+
+OpenAI Whisper transcribes the audio into text.
+
+AI Processing and Response Generation:
+
+The transcribed text is appended to the conversation history.
+
+The complete conversation history (or a summarized version for longer contexts) is sent to the OpenAI gpt-4o-mini model.
+
+The LLM generates a text response.
+
+Text to Speech and Audio Streaming Back:
+
+The LLM's text response is sent to the OpenAI gpt-4o-mini-tts API.
+
+OpenAI TTS streams back mulaw audio chunks.
+
+The backend receives these audio chunks and immediately relays them back to Twilio over the same WebSocket connection.
+
+Audio Playback to Senior:
+
+Twilio receives the audio chunks from the WebSocket and plays them in real-time to the senior on the phone call.
+
+Live Chat Display (Frontend):
+
+The backend (WebSocket server) will send transcribed user speech and generated AI responses to the frontend browser via a separate WebSocket connection for live display in a chatbox format.
+
+6. Technical Requirements
+6.1. Development Stack
+Language: Python 3.8+
+
+Web Framework: Flask or FastAPI (for HTTP endpoints), websockets (for WebSocket server).
+
+Core Libraries: twilio, openai, python-dotenv, audioop (built-in for audio processing).
+
+Deployment:
+
+Local development with ngrok for exposing local server to Twilio.
+
+Cloud deployment on a persistent server (e.g., AWS EC2, Google Cloud Run, Azure App Service, a VPS) that can maintain long-lived WebSocket connections and has adequate CPU/memory for real-time audio processing. Serverless functions (like AWS Lambda, Google Cloud Functions) are generally not ideal for the main WebSocket server due to connection duration limits.
+
+6.2. Real-time Audio Processing
+Audio Format Handling: Efficient conversion of Twilio's mulaw audio to 16-bit PCM for OpenAI, and back.
+
+Buffering: Implement a robust audio buffering mechanism to collect user speech segments before sending to Whisper.
+
+Voice Activity Detection (VAD): Simple RMS-based VAD for detecting silence to segment user utterances. More advanced VAD could be explored later if needed.
+
+Latency: The architecture should aim for minimal end-to-end latency to ensure a natural conversational experience.
+
+6.3. API Integration
+Authentication: Securely load API keys (Twilio, OpenAI) from environment variables.
+
+Error Handling: Implement try-except blocks for all external API calls and audio processing, with informative logging.
+
+Rate Limiting: Implement client-side rate limiting or back-off strategies for OpenAI APIs if hitting limits.
+
+6.4. Conversation Management
+Context: Maintain a deque or list of recent conversational turns ({"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}) to provide context to the LLM.
+
+System Prompt: A clear system prompt for the LLM to guide its persona (helpful, concise, senior-friendly).
+
+6.5. Frontend Interface (Minimal)
+Technology: Basic HTML, CSS, JavaScript.
+
+Input: A simple HTML input field for the phone number (<input type="tel">).
+
+Call Button: A button to trigger the call initiation (e.g., via a fetch request to the backend).
+
+Live Chat Display: A <div> or similar element to dynamically append transcribed user text and generated AI responses. This can be updated via a separate WebSocket connection from the backend.
+
+Status Indicator: Simple visual cues for call status (e.g., "Calling...", "Connected", "AI Speaking", "Disconnected").
+
+6.6. Security
+API Key Management: API keys must not be exposed on the frontend or hardcoded.
+
+Webhook Validation: (Highly Recommended for Production) Implement Twilio webhook signature validation on the backend to verify that incoming requests are legitimate Twilio requests.
+
+Input Validation: Sanitize and validate any user input (e.g., phone numbers).
+
+6.7. Logging and Monitoring
+Structured Logging: Log key events (call initiation, WebSocket connection, STT/LLM/TTS calls, errors, conversation turns) for debugging and performance monitoring.
+
+Tooling: Utilize Python's logging module.
+
+7. Future Technical Considerations (Out of Scope for Initial MVP)
+Concurrency & Session Management: For multiple simultaneous calls, a more sophisticated session management system is needed (e.g., using a dictionary keyed by streamSid to store audio_buffer, conversation_history, etc., per call).
+
+Persistent Conversation History: Storing conversation history in a database (e.g., SQLite, PostgreSQL, Firestore if multi-user is needed) for longer-term context or analytics.
+
+Advanced VAD: Integrating more sophisticated Voice Activity Detection libraries for better performance.
+
+Text Normalization: Pre-processing text before TTS (e.g., expanding abbreviations, numbers) for more natural speech.
+
+Call Recording: Option to record the entire call for quality assurance or compliance.
+
+User Interface Enhancements: More interactive frontend, sentiment analysis visualization.
