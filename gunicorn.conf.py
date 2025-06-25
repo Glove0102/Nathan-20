@@ -6,9 +6,9 @@ backlog = 2048
 
 # Worker processes
 workers = 1
-worker_class = "eventlet"
-worker_connections = 1000
-timeout = 60
+worker_class = "sync"
+threads = 4
+timeout = 120
 keepalive = 30
 
 # Restart workers after this many requests, to help prevent memory leaks
