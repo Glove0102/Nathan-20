@@ -58,12 +58,16 @@ async def handle_twilio_websocket(websocket, path):
                     
                     # Find and update call record
                     with app.app_context():
-                        call = Call.query.filter_by(call_sid=call_sid).first()
-                        if call:
-                            call.stream_sid = stream_sid
-                            call.status = 'connected'
-                            db.session.commit()
-                            session.set_call(call)
+                        try:
+                            call = Call.query.filter_by(call_sid=call_sid).first()
+                            if call:
+                                call.stream_sid = stream_sid
+                                call.status = 'connected'
+                                db.session.commit()
+                                session.set_call(call)
+                        except Exception as e:
+                            logging.error(f"Database error in stream start: {str(e)}")
+                            db.session.rollback()
                     
                     logging.info(f"Stream started - StreamSid: {stream_sid}, CallSid: {call_sid}")
                     
@@ -87,9 +91,13 @@ async def handle_twilio_websocket(websocket, path):
                         logging.info(f"Stream stopped - StreamSid: {session.stream_sid}")
                         
                         with app.app_context():
-                            if session.call:
-                                session.call.status = 'completed'
-                                db.session.commit()
+                            try:
+                                if session.call:
+                                    session.call.status = 'completed'
+                                    db.session.commit()
+                            except Exception as e:
+                                logging.error(f"Database error in stream stop: {str(e)}")
+                                db.session.rollback()
                         
                         # Remove from active sessions
                         if session.stream_sid in active_sessions:
@@ -129,7 +137,10 @@ async def send_initial_greeting(session):
             
             # Add to conversation history
             with app.app_context():
-                session.conversation_manager.add_message("assistant", greeting_text)
+                try:
+                    session.conversation_manager.add_message("assistant", greeting_text)
+                except Exception as e:
+                    logging.error(f"Database error adding greeting: {str(e)}")
             
             # Notify frontend
             socketio.emit('conversation_update', {
@@ -159,7 +170,10 @@ async def process_audio_chunk(session, media_data):
                 
                 # Add to conversation history
                 with app.app_context():
-                    session.conversation_manager.add_message("user", transcript)
+                    try:
+                        session.conversation_manager.add_message("user", transcript)
+                    except Exception as e:
+                        logging.error(f"Database error adding user message: {str(e)}")
                 
                 # Notify frontend
                 socketio.emit('conversation_update', {
@@ -176,7 +190,10 @@ async def process_audio_chunk(session, media_data):
                     
                     # Add to conversation history
                     with app.app_context():
-                        session.conversation_manager.add_message("assistant", response_text)
+                        try:
+                            session.conversation_manager.add_message("assistant", response_text)
+                        except Exception as e:
+                            logging.error(f"Database error adding AI response: {str(e)}")
                     
                     # Convert to speech
                     audio_data = await session.conversation_manager.text_to_speech(response_text)

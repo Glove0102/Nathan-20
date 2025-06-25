@@ -29,7 +29,7 @@ def initiate_call():
         # Create call record
         call = Call(phone_number=phone_number, status='initiating')
         db.session.add(call)
-        db.session.commit()
+        db.session.flush()  # Flush to get the ID without committing
         
         # Get the public URL for webhook
         webhook_url = f"https://{os.environ.get('REPL_SLUG', 'workspace')}.{os.environ.get('REPL_OWNER', 'user')}.repl.co/webhook"
