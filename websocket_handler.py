@@ -38,10 +38,9 @@ def handle_disconnect():
 async def handle_twilio_websocket(websocket):
     """Handle Twilio Media Stream WebSocket connections"""
     session = None
-    path = websocket.path
     
     try:
-        logging.info(f"New Twilio WebSocket connection established on path: {path}")
+        logging.info(f"New Twilio WebSocket connection established")
         
         async for message in websocket:
             try:
