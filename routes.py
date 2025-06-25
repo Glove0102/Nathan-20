@@ -90,8 +90,14 @@ def webhook():
         
         if call_status == 'answered':
             # Get WebSocket URL for media streaming
-            repl_url = os.environ.get('REPL_URL', f"https://{os.environ.get('REPL_SLUG', 'workspace')}.{os.environ.get('REPL_OWNER', 'user')}.repl.co")
-            websocket_url = repl_url.replace('https://', 'wss://') + ":8000"
+            # Use the current replit domain but with the WebSocket port
+            domain = os.environ.get('REPLIT_DOMAINS', '').split(',')[0] if os.environ.get('REPLIT_DOMAINS') else None
+            if not domain:
+                # Fallback to constructing from REPL_SLUG and REPL_OWNER
+                domain = f"{os.environ.get('REPL_SLUG', 'workspace')}.{os.environ.get('REPL_OWNER', 'user')}.repl.co"
+            
+            websocket_url = f"wss://{domain}:8000"
+            logging.info(f"Using WebSocket URL: {websocket_url}")
             
             connect = Connect()
             stream = Stream(url=websocket_url)
